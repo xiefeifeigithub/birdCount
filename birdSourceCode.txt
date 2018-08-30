@@ -1,0 +1,515 @@
+#include <graphics.h>
+#include <conio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <windows.h>
+#include <stdio.h>
+
+#define RANDOM(a,b) (rand()%((b+1) - (a)) + (a))  //产生a到b之间的随机整数
+#define  GEN_VALUE() RANDOM(1,9)
+
+
+typedef struct _Bird           //小鸟包含的基本信息
+{
+    int x;                     //小鸟的位置坐标
+	int y;
+
+	int a;                       //运算式
+	int b;
+	char ch;
+
+	int result;                  //运算结果
+	
+	int count;                   //记录是否被选中
+
+	struct _Bird* next;
+}Bird;
+
+//存储用户姓名和得分
+typedef struct _person
+{
+	char name[10];
+    int score ;
+}per;
+
+void Initialize();                          //初始化游戏界面函数
+Bird* add(Bird* head);                       //增加功能函数
+void play();                                //游戏实现函数
+void draw_bird(Bird* head);                 //画鸟函数 
+void free_memory_list(Bird* head);          //释放链表空间函数
+void move(Bird *head);                         //实现小鸟动态函数
+Bird* Delete(Bird *head);                      //删除选中小鸟函数
+void save_current_state(Bird *head);        //保存当前游戏状态函数
+Bird* import_status(Bird *head);             //导入当前状态函数
+//void score(Bird* head,int score);                     //用户得分动态显示函数
+void pan_chujie(Bird* head);                 //判断小鸟是否出界函数
+void pan_xuanzhong(int a1, int b1, Bird* head);             //判断小鸟是否被选中并同时在答案显示区显示含有正确答案的4个数字
+//void bian_se(int a1,int b1,Bird* head);              //如果鼠标当前位置处为小鸟，则当前位置的小鸟变色
+
+void main()
+{
+	Initialize();
+
+	play();
+
+	getch();
+	closegraph();
+
+}
+
+void Initialize()
+{
+	initgraph(1000,600);
+
+//	setbkcolor(WHITE);      //设置背景色
+//	cleardevice();          //用背景色清空屏幕
+
+	setlinecolor(BLACK);                      //游戏控制区域
+	setfillcolor(RGB(0,255,255));
+	line(0,500,1000,500);
+	line(300,500,300,600);
+	line(600,500,600,600);
+	fillroundrect(5,505,95,545,20,20);//1
+	fillroundrect(5,555,95,595,20,20);//2
+	fillroundrect(105,505,195,545,20,20);//3
+	fillroundrect(105,555,195,595,20,20);//4
+	fillroundrect(205,505,295,545,20,20);//5
+	fillroundrect(205,555,295,595,20,20);//6
+
+	
+	setfillcolor(RGB(251,125,0));             //答案显示区域
+	setlinecolor(BLACK);
+	fillroundrect(620,520,680,580,35,35);
+	fillroundrect(720,520,780,580,35,35);
+	fillroundrect(820,520,880,580,35,35);
+	fillroundrect(920,520,980,580,35,35);
+
+	
+	setbkcolor(RGB(0,255,255)); //设置当前背景色
+	setbkmode(OPAQUE);          //指定文字输出时的背景模式
+	settextcolor(BLACK);        //设置当前文字颜色
+	settextstyle(20,0,("宋体"));//设置当前字体样式
+
+	outtextxy(30,515,"增加");
+	outtextxy(30,565,"删除");
+	outtextxy(130,565,"退出");
+	outtextxy(230,515,"存档");
+	outtextxy(230,565,"导入");
+	settextcolor(WHITE);
+	setbkmode(TRANSPARENT);
+	settextcolor(RGB(237,28,36));
+	outtextxy(375,515,"用户名：");
+	outtextxy(375,565,"得分：");
+}
+
+/*游戏总控制函数*/
+void play()
+{
+	Bird* head = NULL;                     //定义链表头指针
+	per person;
+
+	InputBox(person.name,10,"请输入用户名");
+	outtextxy(450,515,person.name );
+	person.score = 0;
+	outtextxy(450,565,"0");
+
+	srand((unsigned)time(NULL));
+
+	BeginBatchDraw();                                     //开始批量绘图
+	MOUSEMSG m;                            //定义鼠标消息
+	while( true )
+	{
+		while (MouseHit()){//如果检测到鼠标事件
+			m = GetMouseMsg();//获取鼠标事件
+
+			 switch( m.uMsg )
+		    {
+			  case WM_LBUTTONDOWN:
+
+				 if( m.x > 5 && m.x < 95 && m.y > 505 && m.y < 545 )                //增加按钮
+				 { 
+					head = add(head);
+				 }
+
+			//	 if( m.x > 5 && m.x < 95 && m.y > 555 && m.y < 595 )                //如何实现鼠标捕获小鸟的代码？
+			//	 {
+			//		head = Delete(head);
+			//    }
+                 
+				  if( m.x > 105 && m.x < 195 && m.y > 555 && m.y < 595 )             //退出按钮
+				 {
+	    	    	 free_memory_list(head);                                        //释放链表空间					 
+				 }
+
+				 if( m.x > 205 && m.x < 295 && m.y > 505 && m.y < 545 )            //存档按钮
+				 {
+				//	 outtextxy(450,560,"aaa");
+					 save_current_state(head);
+				 }
+
+				 if( m.x > 205 && m.x < 295 && m.y > 555 && m.y < 595 )            //导入按钮
+				 {
+					 head = import_status(head);
+			     }
+
+				  if( m.x > 0 && m.x < 999 && m.y > 0 && m.y < 500 )
+				  {
+	//				  pan_xuanzhong(m.x,m.y,head);
+
+                        setbkcolor(RGB(251,125,0));
+						setbkmode(OPAQUE);
+					  	clearroundrect(620,520,680,580,35,35);
+	                    clearroundrect(720,520,780,580,35,35);
+	                    clearroundrect(820,520,880,580,35,35);
+	                    clearroundrect(920,520,980,580,35,35);
+
+						pan_xuanzhong(m.x,m.y,head);
+				  }
+
+			 }
+		}
+		    
+/*     	    if( m.x > 0 && m.x < 999 && m.y > 0 && m.y < 500 )
+		   {
+			    bian_se(m.x,m.y,head);                                       //使鼠标当前位置处的小鸟变色
+		   }                                               */
+
+			 draw_bird(head);
+
+			 FlushBatchDraw();
+
+			 Sleep(10);	
+
+			 clearrectangle(0,0,999,500);
+
+			 move(head);
+
+			 pan_chujie(head);
+
+//			 score(head,person.score);
+	}
+
+	EndBatchDraw();
+}
+
+/*如果鼠标当前位置处为小鸟，则该小鸟变色*/        /*
+void bian_se(int a1, int b1, Bird* head)
+{
+	Bird* p = NULL;
+	p = head;
+
+	while( p != head )
+	{
+		if( a1 > p->x && a1 < (p->x+100) && b1 > p->y && b1 < p->y+100 );
+		{
+			setfillcolor(RGB(255,0,0));
+			fillellipse(p->x,p->y,p->x + 100,p->y + 50);
+		}
+
+		p = p->next;
+	}
+}                     */
+
+/*增加链表节点的函数*/
+Bird* add(Bird* head)
+{
+	Bird *p = NULL;
+	p = (Bird*)malloc(sizeof(Bird));
+
+	srand((unsigned)time(NULL));
+	int t;
+	char chs[] = { '+', '-', 'X', '/' };
+
+	p = (Bird*)malloc(sizeof(Bird));
+	p->a = rand()%10 + 1;
+	p->b = rand()%10 + 1;
+	p->ch =chs[RANDOM(0,3)];
+
+	if( p->a < p->b )
+    {
+		t = p->a;
+		p->a = p->b;
+		p->b = t;
+	}                    
+
+	switch(p->ch)
+	{
+	case '+':p->result = p->a + p->b;break;
+	case '-':p->result = p->a - p->b;break;
+	case 'X':p->result = p->a * p->b;break;
+	case '/':p->result = p->a / p->b;break;
+	}
+
+	p->x = 0;
+	p->y =rand()%400;
+
+	p->next=head;
+	head=p;
+
+	return head;
+}
+
+/*画小鸟函数*/
+void draw_bird(Bird *head)
+{
+	srand((unsigned)time(NULL));
+	char s1[5],s2,s3[5];
+
+	Bird *p;
+	p = head;
+	
+	while( p != NULL )
+	{
+	    srand((unsigned)time(NULL));
+	    s1[0] = (char)p->a;
+	    s2 = (char)p->ch;
+	    s3[0] = (char)p->b;
+
+
+		ellipse(p->x,p->y,p->x + 100,p->y + 50);
+		settextcolor(BLACK);
+		sprintf(s1,"%d",p->a);                    //输出数值，先将数字格式化为字符串
+        outtextxy(p->x+35,p->y+15,s1);
+		outtextxy(p->x+45,p->y+15,s2);
+		sprintf(s3,"%d",p->b);
+		outtextxy(p->x+55,p->y+15,s3);
+
+		p = p->next ;
+	}
+
+}
+
+/*释放链表*/  
+void free_memory_list(Bird* head)
+{
+	Bird* p = NULL, *q = NULL;
+
+	p = head;
+	if( p == NULL )
+	{
+		closegraph();
+		exit(0);
+	}
+	else
+	{
+		while( p != NULL )
+		{
+			q = p->next ;
+			free(p);
+			p = q;
+		}
+	}
+
+	closegraph();
+	exit(0);
+}
+                                 
+/*让所有小鸟动起来*/    
+void move(Bird *head)
+{
+	Bird *p;
+	p = head;
+	while( p != NULL )
+	{
+		p->x += 2;
+		p = p->next;
+	}
+}
+
+/*判断小鸟是否出界*/
+void pan_chujie(Bird* head)
+{
+	Bird* p;
+	p = head;
+
+	while( p != NULL )
+	{
+		if( p->x > 999 )
+		{
+			p->x = 0;
+		}
+
+		p = p->next;
+	}
+}
+
+/* 判断小鸟是否被选中并同时在答案显示区显示含有正确答案的4个数字 */ 
+void pan_xuanzhong(int a1, int b1, Bird* head)
+{
+	srand((unsigned)time(NULL));
+
+	int temp;
+	Bird* p;
+	p = head;
+
+	while( p != NULL )
+	{
+		if( a1 > p->x && a1 < (p->x+100) && b1 > p->y && b1 < p->y+100 )
+		{
+			setfillcolor(RGB(255,0,0));
+			fillellipse(p->x,p->y,p->x + 100,p->y + 50);
+			char s1[10],s2[10],s3[10],s4[10];
+
+
+			temp = rand()%5+1;
+			if( temp == 1 )
+			{
+				sprintf(s4,"%d",(int)p->result );
+				outtextxy(640,540,s4);
+
+				sprintf(s1,"%d",rand()%20+1);
+				outtextxy(740,540,s1);
+
+				sprintf(s2,"%d",rand()%20+1);
+				outtextxy(840,540,s2);
+
+				sprintf(s3,"%d",rand()%20+1);
+				outtextxy(940,540,s3);
+			}
+
+			if( temp == 2 )
+			{
+				sprintf(s4,"%d",(int)p->result);
+				outtextxy(740,540,s4);
+
+				sprintf(s1,"%d",rand()%20+1);
+				outtextxy(640,540,s1);
+
+				sprintf(s2,"%d",rand()%20+1);
+				outtextxy(840,540,s2);
+
+				sprintf(s3,"%d",rand()%20+1);
+				outtextxy(940,540,s3);
+			}
+
+			if( temp == 3 )
+			{
+				sprintf(s4,"%d",(int)p->result);
+				outtextxy(840,540,s4);
+
+				sprintf(s1,"%d",rand()%20+1);
+				outtextxy(740,540,s1);
+
+				sprintf(s2,"%d",rand()%20+1);
+				outtextxy(640,540,s2);
+
+				sprintf(s3,"%d",rand()%20+1);
+				outtextxy(940,540,s3);
+			}
+
+			if( temp == 4 )
+			{
+				sprintf(s4,"%d",(int)p->result);
+				outtextxy(940,540,s4);
+
+				sprintf(s1,"%d",rand()%20+1);
+				outtextxy(740,540,s1);
+
+				sprintf(s2,"%d",rand()%20+1);
+				outtextxy(840,540,s2);
+
+				sprintf(s3,"%d",rand()%20+1);
+				outtextxy(640,540,s3);
+			}
+		
+		}
+
+		p = p->next;
+	}
+}      
+
+/* 用户得分动态显示区域?*/  
+void score(Bird* head,int score)
+{
+	Bird* p = NULL;
+	p = head;
+
+	while( p != NULL )
+	{
+		if( p->x >= 999 )
+		{
+			score--;
+			settextcolor(WHITE);
+	        setbkmode(TRANSPARENT);
+	        settextcolor(BLACK);
+			clearrectangle(445,560,465,575);
+			char s[5];
+			s[0] = score;
+			sprintf(s,"%d",score);
+			outtextxy(450,565,s);
+		}
+
+		p = p->next ;
+	}
+}    
+                          
+/*保存当前游戏存状态函数*/             
+void save_current_state(Bird* head)
+{
+	FILE *fp;
+	Bird *p;
+
+	p = head;
+	char route[10];
+	InputBox(0,0,"存档");
+
+	if( ( fp = fopen("e:\\xiaoniao.txt","w") ) == NULL )
+	{
+         exit(0);
+	}
+	else
+	{            
+	    while( p != NULL )
+	  {
+		    fprintf(fp,"%d %d %d %d %d %c ",p->x,p->y,p->a,p->b,p->result,p->ch);
+
+		    p = p->next;
+	  }
+	               
+	}
+
+	fclose(fp);         
+}               
+                 
+/*导入当前状态函数*/     
+Bird* import_status(Bird *head)
+{
+	FILE *fp;
+	Bird *p;
+
+	p = head;
+	InputBox(0,0,"导入");
+	if( ( fp = fopen("e:\\xiaoniao.txt","r") ) == NULL )
+	{
+		exit(0);
+	}
+	else
+	{
+		int ch;
+
+		ch = fgetc(fp);
+		if( ch == EOF )
+		{
+			exit(0);
+		}
+
+		rewind(fp);                     //如果不是，让文件内部的指针重新指向文件开头
+		
+		while( !feof(fp) )             //判断是否到达文件末尾
+		{
+			Bird* p = NULL;
+			p = (Bird*)malloc(sizeof(Bird));
+			fscanf( fp,"%d %d %d %d %d %c ",&p->x, &p->y, &p->a, &p->b, &p->result, &p->ch );
+			p->next = head;
+			head= p;
+		}
+
+	}
+
+	fclose(fp);
+
+	return head;
+}                 
+                            
+
+          
